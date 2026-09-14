@@ -1,90 +1,97 @@
 import { LLMManager } from '../services/llm/manager.js';
-import { LLMConfig } from '../services/llm/types.js';
+import { LLMConfig, LLMProviderType } from '../services/llm/types.js';
 
 let llmManager: LLMManager | null = null;
 
+function parseBooleanEnv(value: string | undefined, defaultValue: boolean): boolean {
+  if (value === undefined || value === '') return defaultValue;
+  return value.toLowerCase() === 'true';
+}
+
 export class LLMConfigManager {
+  private createConfigForProvider(provider: LLMProviderType): LLMConfig | null {
+    switch (provider) {
+      case 'openai-compatible': {
+        const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY;
+        if (!apiKey) return null;
+        return {
+          provider: 'openai-compatible',
+          model: process.env.OPENAI_COMPATIBLE_MODEL || 'kimi-k2.6',
+          api_key: apiKey,
+          base_url: process.env.OPENAI_COMPATIBLE_BASE_URL,
+          disable_tools: parseBooleanEnv(process.env.OPENAI_COMPATIBLE_DISABLE_TOOLS, true),
+          max_tokens: 1000,
+          temperature: 0.7
+        };
+      }
+      case 'gemini': {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return null;
+        return {
+          provider: 'gemini',
+          model: process.env.GEMINI_MODEL || 'gemini-3.7-flash',
+          api_key: apiKey,
+          max_tokens: 1000,
+          temperature: 0.7
+        };
+      }
+      case 'claude': {
+        const apiKey = process.env.CLAUDE_API_KEY;
+        if (!apiKey) return null;
+        return {
+          provider: 'claude',
+          model: process.env.CLAUDE_MODEL || 'claude-3-sonnet-20240229',
+          api_key: apiKey,
+          max_tokens: 1000,
+          temperature: 0.7
+        };
+      }
+      case 'openai': {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) return null;
+        return {
+          provider: 'openai',
+          model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
+          api_key: apiKey,
+          max_tokens: 1000,
+          temperature: 0.7
+        };
+      }
+      case 'perplexity': {
+        const apiKey = process.env.PERPLEXITY_API_KEY;
+        if (!apiKey) return null;
+        return {
+          provider: 'perplexity',
+          model: process.env.PERPLEXITY_MODEL || 'llama-3.1-sonar-small-128k-online',
+          api_key: apiKey,
+          max_tokens: 1000,
+          temperature: 0.7
+        };
+      }
+      default:
+        return null;
+    }
+  }
+
   private async detectAndCreateConfig(): Promise<LLMConfig> {
-    // Try to create config from environment variables
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const claudeKey = process.env.CLAUDE_API_KEY;
-    const openaiKey = process.env.OPENAI_API_KEY;
-    const perplexityKey = process.env.PERPLEXITY_API_KEY;
-    
-    // Primary provider preference from env or default to gemini
-    const primaryProvider = (process.env.PRIMARY_LLM_PROVIDER || 'gemini') as 'gemini' | 'claude' | 'openai' | 'perplexity';
-    
-    // Create config for primary provider if key exists
-    if (primaryProvider === 'gemini' && geminiKey) {
-      return {
-        provider: 'gemini',
-        model: process.env.GEMINI_MODEL || 'gemini-3.7-flash',
-        api_key: geminiKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
-    } else if (primaryProvider === 'claude' && claudeKey) {
-      return {
-        provider: 'claude',
-        model: 'claude-3-sonnet-20240229',
-        api_key: claudeKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
-    } else if (primaryProvider === 'openai' && openaiKey) {
-      return {
-        provider: 'openai',
-        model: 'gpt-3.5-turbo',
-        api_key: openaiKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
-    } else if (primaryProvider === 'perplexity' && perplexityKey) {
-      return {
-        provider: 'perplexity',
-        model: 'llama-3.1-sonar-small-128k-online',
-        api_key: perplexityKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
+    const primaryProvider = (process.env.PRIMARY_LLM_PROVIDER || 'gemini') as LLMProviderType;
+    const primaryConfig = this.createConfigForProvider(primaryProvider);
+    if (primaryConfig) return primaryConfig;
+
+    const fallbackOrder: LLMProviderType[] = [
+      'gemini',
+      'claude',
+      'openai',
+      'perplexity',
+      'openai-compatible'
+    ];
+
+    for (const provider of fallbackOrder) {
+      const config = this.createConfigForProvider(provider);
+      if (config) return config;
     }
-    
-    // Fallback to any available provider
-    if (geminiKey) {
-      return {
-        provider: 'gemini',
-        model: process.env.GEMINI_MODEL || 'gemini-3.7-flash',
-        api_key: geminiKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
-    } else if (claudeKey) {
-      return {
-        provider: 'claude',
-        model: 'claude-3-sonnet-20240229',
-        api_key: claudeKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
-    } else if (openaiKey) {
-      return {
-        provider: 'openai',
-        model: 'gpt-3.5-turbo',
-        api_key: openaiKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
-    } else if (perplexityKey) {
-      return {
-        provider: 'perplexity',
-        model: 'llama-3.1-sonar-small-128k-online',
-        api_key: perplexityKey,
-        max_tokens: 1000,
-        temperature: 0.7
-      };
-    }
-    
-    throw new Error('No LLM API keys found in environment variables (GEMINI_API_KEY, CLAUDE_API_KEY, OPENAI_API_KEY, PERPLEXITY_API_KEY)');
+
+    throw new Error('No LLM API keys found in environment variables (OPENAI_COMPATIBLE_API_KEY, GEMINI_API_KEY, CLAUDE_API_KEY, OPENAI_API_KEY, PERPLEXITY_API_KEY)');
   }
 
   private async getLLMManager(): Promise<LLMManager> {
@@ -140,7 +147,7 @@ export class LLMConfigManager {
           league_info: [{ test_prompt: testPrompt }]
         }
       });
-      
+
       return {
         success: true,
         response: response.summary
@@ -155,7 +162,7 @@ export class LLMConfigManager {
 
   async generateResponse(prompt: string): Promise<{ content: string; cost?: number }> {
     const manager = await this.getLLMManager();
-    
+
     // Use direct LLM provider chat for simple text generation
     // This bypasses the complex fantasy analysis tools that might be causing issues
     try {
@@ -163,26 +170,26 @@ export class LLMConfigManager {
       if (!provider) {
         throw new Error('No LLM provider initialized');
       }
-      
+
       const response = await provider.chat([
         { role: 'user', content: prompt }
       ], {
         max_tokens: 1000,
         temperature: 0.7
       });
-      
+
       return {
         content: response.content || 'No response generated',
         cost: response.usage?.total_tokens ? response.usage.total_tokens * 0.000001 : 0.001 // Rough estimate
       };
     } catch (directError: any) {
       console.warn('Direct LLM call failed, trying fantasy analysis method:', directError.message);
-      
+
       // Fallback to fantasy analysis method
       const response = await manager.analyzeFantasyData({
         context: {
           week: 1,
-          day_of_week: 'Monday', 
+          day_of_week: 'Monday',
           action_type: 'analysis',
           priority: 'medium'
         },
@@ -193,7 +200,7 @@ export class LLMConfigManager {
           league_info: [{ custom_prompt: prompt }]
         }
       });
-      
+
       return {
         content: response.summary || 'Analysis completed',
         cost: response.cost_estimate?.estimated_cost
@@ -201,35 +208,13 @@ export class LLMConfigManager {
     }
   }
 
-  async switchProvider(provider: 'gemini' | 'claude' | 'openai' | 'perplexity'): Promise<boolean> {
+  async switchProvider(provider: LLMProviderType): Promise<boolean> {
     try {
-      const config = await this.detectAndCreateConfig();
-      config.provider = provider;
-      
-      // Get the correct API key for the provider
-      switch (provider) {
-        case 'gemini':
-          config.api_key = process.env.GEMINI_API_KEY || '';
-          config.model = process.env.GEMINI_MODEL || 'gemini-3.7-flash';
-          break;
-        case 'claude':
-          config.api_key = process.env.CLAUDE_API_KEY || '';
-          config.model = 'claude-3-sonnet-20240229';
-          break;
-        case 'openai':
-          config.api_key = process.env.OPENAI_API_KEY || '';
-          config.model = 'gpt-3.5-turbo';
-          break;
-        case 'perplexity':
-          config.api_key = process.env.PERPLEXITY_API_KEY || '';
-          config.model = 'llama-3.1-sonar-small-128k-online';
-          break;
-      }
-      
-      if (!config.api_key) {
+      const config = this.createConfigForProvider(provider);
+      if (!config) {
         throw new Error(`No API key found for ${provider}`);
       }
-      
+
       llmManager = new LLMManager();
       const success = await llmManager.initialize(config);
       return success;

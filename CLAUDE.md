@@ -13,7 +13,7 @@ There is **no web frontend**. This is a backend/automation-only repository.
 **Automation**: GitHub Actions, TypeScript, Node.js, Commander (CLI)
 **MCP Server**: Model Context Protocol for Claude Desktop integration
 **Backend API**: Node.js, Express 4, TypeScript, Puppeteer (ESPN auth), node-cache
-**LLM Providers**: Gemini (default), Claude, OpenAI, Perplexity
+**LLM Providers**: Gemini (default), Claude, OpenAI, OpenAI-compatible, Perplexity
 **Architecture**: Dual-mode system (GitHub Actions scheduled jobs + Claude Desktop interactive)
 
 ## Project Structure
@@ -121,9 +121,11 @@ POST /api/test/test-cookies | test-public-league | test-endpoint
 
 ## LLM Layer
 
-Providers live in `shared/src/services/llm/providers/` (`base`, `gemini`, `claude`, `openai`, `perplexity`). Add new providers there and extend `BaseLLMProvider`.
+Providers live in `shared/src/services/llm/providers/` (`base`, `gemini`, `claude`, `openai`, `perplexity`). OpenAI-compatible providers reuse `OpenAIProvider` with `base_url`. Add new native providers there and extend `BaseLLMProvider`.
 
-- Default is **Gemini 3.x**; override the model with the `GEMINI_MODEL` env var rather than editing code.
+- Default remains **Gemini 3.x** for backward compatibility; override the model with `GEMINI_MODEL` rather than editing code.
+- The workflow YAML remains backward-compatible with Gemini as its fallback default, but this repository's scheduled GitHub Actions are configured via repo variables to use the generic **OpenAI-compatible** provider pointed at Ollama Cloud: `PRIMARY_LLM_PROVIDER=openai-compatible`, `OPENAI_COMPATIBLE_MODEL=kimi-k2.6`, `OPENAI_COMPATIBLE_BASE_URL=https://ollama.com/v1`.
+- OpenAI-compatible tool/function calling is disabled by default (`OPENAI_COMPATIBLE_DISABLE_TOOLS=true`) because some compatible APIs reject unsupported `tools` / `tool_choice` fields. When disabled, analysis uses the provided ESPN/projection data directly and may include guidance for manual searches instead of making tool calls.
 - Gemini 3.x models think by default and thinking tokens count against `maxOutputTokens`, so `thinkingConfig.thinkingLevel` is pinned to `'low'` and `validateConfig()` uses a 500-token budget. Do not lower it — small budgets return empty content with `finishReason: MAX_TOKENS`.
 - Model pricing tables are hardcoded in `getPricing()` (per 1M tokens) and `enhancedCostMonitor.ts` (per 1K tokens). Both need updating together when rates change.
 
@@ -149,12 +151,12 @@ Copy `.env.example` and fill in. Required for any real run:
 ESPN_S2=...            # ESPN auth cookie
 ESPN_SWID={...}        # ESPN SWID, braces included
 LEAGUE_1_ID=...        # plus LEAGUE_1_TEAM_ID, LEAGUE_1_NAME
-GEMINI_API_KEY=...     # or CLAUDE_API_KEY / OPENAI_API_KEY / PERPLEXITY_API_KEY
+GEMINI_API_KEY=...     # or OPENAI_COMPATIBLE_API_KEY / CLAUDE_API_KEY / OPENAI_API_KEY / PERPLEXITY_API_KEY
 ```
 
-Optional: `LEAGUE_2_*`, `GEMINI_MODEL`, `PRIMARY_LLM_PROVIDER`, `FALLBACK_LLM_PROVIDER`, `FANTASYPROS_SESSION_ID` (or email/password), `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`, `NEWS_API_KEY`, `OPENWEATHER_API_KEY`, `ENABLE_FANTASYPROS` / `ENABLE_NEWS` / `ENABLE_WEATHER`, and the cost limits (`DAILY_COST_LIMIT`, `WEEKLY_COST_LIMIT`, `MONTHLY_COST_LIMIT`, `PER_ANALYSIS_LIMIT`).
+Optional: `LEAGUE_2_*`, `GEMINI_MODEL`, `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_COMPATIBLE_MODEL`, `OPENAI_COMPATIBLE_DISABLE_TOOLS`, `PRIMARY_LLM_PROVIDER`, `FALLBACK_LLM_PROVIDER`, `FANTASYPROS_SESSION_ID` (or email/password), `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`, `NEWS_API_KEY`, `OPENWEATHER_API_KEY`, `ENABLE_FANTASYPROS` / `ENABLE_NEWS` / `ENABLE_WEATHER`, and the cost limits (`DAILY_COST_LIMIT`, `WEEKLY_COST_LIMIT`, `MONTHLY_COST_LIMIT`, `PER_ANALYSIS_LIMIT`).
 
-For GitHub Actions these are repository **secrets**, except `GEMINI_MODEL` and `PRIMARY_LLM_PROVIDER` which are repository **variables**.
+For GitHub Actions, API keys/cookies/webhooks are repository **secrets**; model/provider selectors such as `GEMINI_MODEL`, `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_COMPATIBLE_MODEL`, `OPENAI_COMPATIBLE_DISABLE_TOOLS`, and `PRIMARY_LLM_PROVIDER` are repository **variables**.
 
 `PORT` (default 3003) applies to the local server only.
 
@@ -172,7 +174,6 @@ sudo apt-get install -y chromium-browser     # Debian/Ubuntu
 - **`shared/` and `mcp-server/` contain duplicated copies** of `gemini.ts`, `enhancedCostMonitor.ts`, `costMonitor.ts`, `abTesting.ts`, `espnApi.ts`, and `feedbackLoop.ts`. Edits must be applied to both or they drift.
 - **`@google/generative-ai` is Google's deprecated SDK**, superseded by `@google/genai`. It currently works, including passing `thinkingConfig` through, but it is the next thing likely to break.
 - **Gemini Flash pricing doubles on 2027-01-01** per Google's published rates; the hardcoded tables will under-report cost by 2x after that date.
-- `.env.example` has drifted from the workflow: it lists `DEFAULT_LLM_PROVIDER` (code uses `PRIMARY_LLM_PROVIDER` / `FALLBACK_LLM_PROVIDER`) and `SLACK_WEBHOOK_URL` but not `DISCORD_WEBHOOK_URL`.
 - The local server's CORS origin is still pinned to `http://localhost:5173`, left over from a removed React client. Harmless but vestigial.
 - Single concurrent user session in the local server (last login wins); no database persistence (memory only).
 - ESPN rate limiting is not handled and will surface as 429s.
@@ -182,6 +183,7 @@ sudo apt-get install -y chromium-browser     # Debian/Ubuntu
 1. **Build `shared/` first** — dependents consume its compiled `dist/`
 2. **Mirror edits into `mcp-server/`** while the duplication exists
 3. **Never hardcode a season year** — use `getCurrentNFLSeasonYear()`
-4. **Never hardcode a model name** — use `GEMINI_MODEL` and the provider config
+4. **Never hardcode a model name** — use provider env vars (for example `GEMINI_MODEL` or `OPENAI_COMPATIBLE_MODEL`) and the provider config
 5. **Verify with `cd fantasy-engine/automation && npm run build`** — that is what CI actually runs
-6. Respect ESPN rate limits; test locally before pushing workflow changes
+6. Keep `.env.example`, `fantasy-engine/.env.example`, automation `.env.example`, and workflow LLM variables synchronized when changing provider options
+7. Respect ESPN rate limits; test locally before pushing workflow changes

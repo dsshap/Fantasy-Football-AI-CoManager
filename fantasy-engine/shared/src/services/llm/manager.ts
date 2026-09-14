@@ -25,6 +25,7 @@ export class LLMManager {
           provider = new ClaudeProvider(config);
           break;
         case 'openai':
+        case 'openai-compatible':
           provider = new OpenAIProvider(config);
           break;
         case 'perplexity':
@@ -81,6 +82,7 @@ export class LLMManager {
         provider = new ClaudeProvider(tempConfig);
         break;
       case 'openai':
+      case 'openai-compatible':
         provider = new OpenAIProvider(tempConfig);
         break;
       case 'perplexity':
@@ -119,11 +121,18 @@ export class LLMManager {
 
     const startTime = Date.now();
 
+    // Define available tools
+    const tools = this.getFantasyTools();
+
     // Build context-rich system message
     const systemPrompt = this.buildSystemPrompt(request);
     
     // Build user message with data
-    const userPrompt = this.buildUserPrompt(request);
+    let userPrompt = this.buildUserPrompt(request);
+
+    if (this.config.disable_tools) {
+      userPrompt += `\n\nTool/function calling is disabled for this provider. Use the supplied request data directly. If additional data would normally be required, mention the relevant tool and required inputs from this reference instead of attempting a tool call:\n${this.formatToolDescriptionsForPrompt(tools)}`;
+    }
 
     // Create messages
     const messages: LLMMessage[] = [
@@ -131,22 +140,30 @@ export class LLMManager {
       { role: 'user', content: userPrompt }
     ];
 
-    // Define available tools
-    const tools = this.getFantasyTools();
 
     try {
-      // Make initial request
-      let response = await this.currentProvider.chat(messages, {
-        tools,
+      const chatOptions: {
+        tools?: LLMTool[];
+        max_tokens?: number;
+        temperature?: number;
+        tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
+      } = {
         max_tokens: 4000,
-        temperature: 0.3, // Lower temperature for more consistent fantasy advice
-        tool_choice: 'auto'
-      });
+        temperature: 0.3 // Lower temperature for more consistent fantasy advice
+      };
+
+      if (!this.config.disable_tools) {
+        chatOptions.tools = tools;
+        chatOptions.tool_choice = 'auto';
+      }
+
+      // Make initial request
+      let response = await this.currentProvider.chat(messages, chatOptions);
 
       let toolCallCount = 0;
       
       // Handle tool calls
-      if (response.tool_calls && response.tool_calls.length > 0) {
+      if (!this.config.disable_tools && response.tool_calls && response.tool_calls.length > 0) {
         // Execute tools and continue conversation
         const toolResults = await this.executeFantasyTools(response.tool_calls);
         toolCallCount = response.tool_calls.length;
@@ -355,6 +372,16 @@ Be concise but thorough. This is time-sensitive fantasy advice.`;
         }
       }
     ];
+  }
+
+  private formatToolDescriptionsForPrompt(tools: LLMTool[]): string {
+    return tools.map(tool => {
+      const required = tool.input_schema.required?.length ? tool.input_schema.required.join(', ') : 'none';
+      const properties = Object.entries(tool.input_schema.properties)
+        .map(([name, schema]: [string, any]) => `${name}${tool.input_schema.required?.includes(name) ? ' (required)' : ''}: ${schema.description || schema.type || 'value'}`)
+        .join('; ');
+      return `- ${tool.name}: ${tool.description}. Required inputs: ${required}. Inputs: ${properties || 'none'}.`;
+    }).join('\n');
   }
 
   private async executeFantasyTools(toolCalls: any[]): Promise<any[]> {

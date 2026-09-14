@@ -38,13 +38,16 @@ export interface LLMResponse {
   finish_reason?: 'stop' | 'tool_calls' | 'length' | 'content_filter';
 }
 
+export type LLMProviderType = 'gemini' | 'claude' | 'openai' | 'perplexity' | 'openai-compatible';
+
 export interface LLMConfig {
-  provider: 'claude' | 'openai' | 'perplexity' | 'gemini';
+  provider: LLMProviderType;
   model: string;
   api_key: string;
   max_tokens?: number;
   temperature?: number;
   base_url?: string; // For custom endpoints
+  disable_tools?: boolean; // Omit tool/function calling for providers that do not support it
 }
 
 export interface LLMProvider {

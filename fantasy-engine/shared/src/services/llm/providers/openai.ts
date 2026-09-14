@@ -4,7 +4,7 @@ import { LLMMessage, LLMTool, LLMResponse, LLMConfig } from '../types.js';
 
 export class OpenAIProvider extends BaseLLMProvider {
   private client: OpenAI;
-  
+
   constructor(config: LLMConfig) {
     super(config);
     this.client = new OpenAI({
@@ -12,11 +12,12 @@ export class OpenAIProvider extends BaseLLMProvider {
       baseURL: config.base_url
     });
   }
-  
+
   get name(): string {
+    if (this.config.provider === 'openai-compatible') return 'OpenAI Compatible';
     return 'OpenAI';
   }
-  
+
   get models(): string[] {
     return [
       'gpt-4o',
@@ -24,11 +25,13 @@ export class OpenAIProvider extends BaseLLMProvider {
       'gpt-4-turbo',
       'gpt-4',
       'gpt-3.5-turbo',
+      'kimi-k2.6',
+      'kimi-k3',
       'o1-preview',
       'o1-mini'
     ];
   }
-  
+
   async chat(
     messages: LLMMessage[],
     options?: {
@@ -40,24 +43,24 @@ export class OpenAIProvider extends BaseLLMProvider {
   ): Promise<LLMResponse> {
     return this.withRetry(async () => {
       const startTime = Date.now();
-      
+
       // Convert messages to OpenAI format
       const openaiMessages = this.standardizeMessages(messages).map(msg => ({
         role: msg.role,
         content: msg.content
       }));
-      
+
       const requestOptions: any = {
         model: this.config.model,
         messages: openaiMessages,
         max_tokens: options?.max_tokens || this.config.max_tokens || 4000,
         temperature: options?.temperature || this.config.temperature || 0.7
       };
-      
+
       // Add tools if provided
       if (options?.tools && options.tools.length > 0) {
         requestOptions.tools = this.convertTools(options.tools);
-        
+
         if (options.tool_choice) {
           if (options.tool_choice === 'auto' || options.tool_choice === 'none') {
             requestOptions.tool_choice = options.tool_choice;
@@ -69,15 +72,15 @@ export class OpenAIProvider extends BaseLLMProvider {
           }
         }
       }
-      
+
       const response = await this.client.chat.completions.create(requestOptions);
       const responseTime = Date.now() - startTime;
-      
+
       const message = response.choices[0]?.message;
       if (!message) {
         throw new Error('No message in OpenAI response');
       }
-      
+
       // Extract tool calls
       const tool_calls = message.tool_calls?.map(tc => {
         if ('function' in tc) {
@@ -88,7 +91,7 @@ export class OpenAIProvider extends BaseLLMProvider {
         }
         return null;
       }).filter((tc): tc is { name: string; arguments: any } => tc !== null);
-      
+
       return {
         content: message.content || '',
         tool_calls,
@@ -106,7 +109,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       };
     });
   }
-  
+
   getPricing(): { input_cost_per_token: number; output_cost_per_token: number; currency: string } {
     // Pricing as of early 2025 (in USD per million tokens, converted to per token)
     const pricingMap: Record<string, any> = {
@@ -118,9 +121,11 @@ export class OpenAIProvider extends BaseLLMProvider {
       'o1-preview': { input: 15.00, output: 60.00 },
       'o1-mini': { input: 3.00, output: 12.00 }
     };
-    
-    const pricing = pricingMap[this.config.model] || pricingMap['gpt-4o'];
-    
+
+    // Unknown OpenAI-compatible models vary by provider. Use a documented zero-cost
+    // placeholder instead of incorrectly applying OpenAI GPT-4o pricing.
+    const pricing = pricingMap[this.config.model] || { input: 0, output: 0 };
+
     return {
       input_cost_per_token: pricing.input / 1000000,
       output_cost_per_token: pricing.output / 1000000,

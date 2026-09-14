@@ -621,8 +621,13 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
       }
     };
 
-    console.log('🔧 Starting LLM analysis with web search tool available...');
-    console.log(`📊 Tool configuration: web_search tool enabled with description: ${webSearchTool.description}`);
+    const primaryProvider = process.env.PRIMARY_LLM_PROVIDER || '';
+    const toolsDisabled = primaryProvider === 'openai-compatible'
+      ? process.env.OPENAI_COMPATIBLE_DISABLE_TOOLS !== 'false'
+      : false;
+
+    console.log(`🔧 Starting LLM analysis with web search tool ${toolsDisabled ? 'disabled' : 'available'}...`);
+    console.log(`📊 Tool configuration: web_search tool ${toolsDisabled ? 'will be described in prompt only' : `enabled with description: ${webSearchTool.description}`}`);
     
     // Get the LLM manager to access the provider directly
     const llmManager = await (llmConfig as any).getLLMManager();
@@ -633,6 +638,27 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
     }
     
     console.log(`🤖 Using LLM provider: ${provider.name}`);    
+
+    if (toolsDisabled) {
+      const directPrompt = `${prompt}\n\nNOTE: Tool/function calling is disabled for this OpenAI-compatible provider. Do not call web_search. Provide the best analysis from the ESPN roster, projections, and waiver data already supplied. If current injury/news verification is needed, list the specific searches the user should run manually.`;
+      const response = await provider.chat([
+        { role: 'user', content: directPrompt }
+      ], {
+        // Reasoning OpenAI-compatible models can spend thousands of tokens before
+        // emitting visible text. Use a larger budget for the final analysis path.
+        max_tokens: parseInt(process.env.LLM_MAX_OUTPUT_TOKENS || '12000'),
+        temperature: 0.7,
+        tool_choice: 'none'
+      });
+      console.log(`📤 Direct LLM response received: content=${(response.content || '').length} chars, finish=${response.finish_reason}, usage=${JSON.stringify(response.usage)}`);
+
+      const content = response.content || 'Analysis completed.';
+      return {
+        content,
+        cost: (response.usage?.total_tokens || 0) * 0.000001,
+        searches_performed: 0
+      };
+    }
 
     let searchCount = 0;
     const maxSearches = parseInt(process.env.MAX_WEB_SEARCHES || '5');
@@ -651,12 +677,28 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
       console.log(`📝 Messages in conversation: ${messages.length}`);
       console.log('🔧 Calling LLM with tools enabled...');
       
-      const response = await provider.chat(messages, {
-        tools: [webSearchTool],
-        max_tokens: 4000,
-        temperature: 0.7,
-        tool_choice: 'auto'
-      });
+      let response;
+      try {
+        response = await provider.chat(messages, {
+          tools: [webSearchTool],
+          max_tokens: 4000,
+          temperature: 0.7,
+          tool_choice: 'auto'
+        });
+      } catch (toolError: any) {
+        console.warn(`⚠️ Tool-enabled LLM call failed (${toolError.message}); retrying without tool/function calling`);
+        response = await provider.chat([
+          ...messages,
+          {
+            role: 'user',
+            content: 'Tool/function calling failed for this provider. Continue without calling tools and provide the best analysis from the data already supplied.'
+          }
+        ], {
+          max_tokens: 4000,
+          temperature: 0.7,
+          tool_choice: 'none'
+        });
+      }
       
       console.log(`📤 LLM Response received:`);
       console.log(`  - Content length: ${(response.content || '').length} chars`);
