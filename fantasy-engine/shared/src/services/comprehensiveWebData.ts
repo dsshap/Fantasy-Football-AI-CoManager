@@ -447,12 +447,16 @@ export class ComprehensiveWebData {
 }
 
 // Export configured instance
+const configuredMaxWebSearches = process.env.MAX_WEB_SEARCHES
+  ? parseInt(process.env.MAX_WEB_SEARCHES)
+  : undefined;
+
 export const comprehensiveWebData = new ComprehensiveWebData({
   enableFantasyOptimization: true,
   useRSSFeeds: true,
   combineResultTypes: true,
   prioritizeRecency: true,
-  maxSearches: 10,
+  maxSearches: configuredMaxWebSearches || 10,
   maxResultsPerSearch: 5
 });
 
@@ -464,6 +468,6 @@ export const configuredComprehensiveWebData = new ComprehensiveWebData({
   useRSSFeeds: true,
   combineResultTypes: true,
   prioritizeRecency: true,
-  maxSearches: 15,
+  maxSearches: configuredMaxWebSearches || 15,
   maxResultsPerSearch: 8
 });

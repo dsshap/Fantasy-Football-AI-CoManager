@@ -92,6 +92,10 @@ jobs:
           OPENAI_COMPATIBLE_BASE_URL: ${{ vars.OPENAI_COMPATIBLE_BASE_URL }}
           OPENAI_COMPATIBLE_MODEL: ${{ vars.OPENAI_COMPATIBLE_MODEL }}
           OPENAI_COMPATIBLE_DISABLE_TOOLS: ${{ vars.OPENAI_COMPATIBLE_DISABLE_TOOLS }}
+          MAX_WEB_SEARCHES: ${{ vars.MAX_WEB_SEARCHES || '5' }}
+          MAX_WEB_SEARCH_RESULT_CHARS: ${{ vars.MAX_WEB_SEARCH_RESULT_CHARS || '3000' }}
+          LLM_MAX_OUTPUT_TOKENS: ${{ vars.LLM_MAX_OUTPUT_TOKENS || '12000' }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
           PRIMARY_LLM_PROVIDER: ${{ vars.PRIMARY_LLM_PROVIDER || 'gemini' }}
         run: |
           echo "🧠 Phase 4 Intelligence Preflight Check"
@@ -218,6 +222,10 @@ jobs:
           OPENAI_COMPATIBLE_BASE_URL: ${{ vars.OPENAI_COMPATIBLE_BASE_URL }}
           OPENAI_COMPATIBLE_MODEL: ${{ vars.OPENAI_COMPATIBLE_MODEL }}
           OPENAI_COMPATIBLE_DISABLE_TOOLS: ${{ vars.OPENAI_COMPATIBLE_DISABLE_TOOLS }}
+          MAX_WEB_SEARCHES: ${{ vars.MAX_WEB_SEARCHES || '5' }}
+          MAX_WEB_SEARCH_RESULT_CHARS: ${{ vars.MAX_WEB_SEARCH_RESULT_CHARS || '3000' }}
+          LLM_MAX_OUTPUT_TOKENS: ${{ vars.LLM_MAX_OUTPUT_TOKENS || '12000' }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
           PRIMARY_LLM_PROVIDER: ${{ vars.PRIMARY_LLM_PROVIDER || 'gemini' }}
           
           # FantasyPros Configuration (Optional)
@@ -700,13 +708,15 @@ jobs:
               done
             fi
           }
-          
+
+          # Slack delivery/formatting lives in .github/scripts/slack-notify.sh to keep this workflow parseable.
+
           # Build description content - PRIORITIZE full LLM response
           DESCRIPTION=""
           
           # Check if we have the full LLM response
           if [[ -n "$FULL_LLM_RESPONSE" && ${#FULL_LLM_RESPONSE} -gt 50 ]]; then
-            echo "✅ Using FULL LLM RESPONSE for Discord (${#FULL_LLM_RESPONSE} chars)"
+            echo "✅ Using FULL LLM RESPONSE for notifications (${#FULL_LLM_RESPONSE} chars)"
             DESCRIPTION="$FULL_LLM_RESPONSE"
           else
             echo "⚠️ No full LLM response found, using fallback insights"
@@ -739,15 +749,43 @@ jobs:
             fi
           fi
           
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          FOOTER_TEXT="Fantasy AI Phase 4 Advanced Intelligence • $(date +'%b %d, %Y at %I:%M %p UTC')"
+          TIMESTAMP_VALUE="$(date -Iseconds)"
+          DISCORD_STATUS="skipped"
+          SLACK_STATUS="skipped"
+
           # Send Discord notifications with chunking support
           if [[ -n "$DISCORD_WEBHOOK_URL" ]]; then
-            FOOTER_TEXT="Fantasy AI Phase 4 Advanced Intelligence • $(date +'%b %d, %Y at %I:%M %p UTC')"
-            TIMESTAMP_VALUE="$(date -Iseconds)"
-            
-            send_discord_messages "$DESCRIPTION" "🧠 Phase 4 Advanced Intelligence - $STATUS" "$STATUS" "$COLOR" "$MODE" "$WEEK" "$GRADE" "$FOOTER_TEXT" "$TIMESTAMP_VALUE"
+            if send_discord_messages "$DESCRIPTION" "🧠 Phase 4 Advanced Intelligence - $STATUS" "$STATUS" "$COLOR" "$MODE" "$WEEK" "$GRADE" "$FOOTER_TEXT" "$TIMESTAMP_VALUE"; then
+              DISCORD_STATUS="sent"
+            else
+              DISCORD_STATUS="failed"
+              echo "::warning::Discord notification delivery failed"
+            fi
+          else
+            echo "ℹ️ Discord webhook not configured; skipping Discord notification"
           fi
-          
-          echo "📨 Notifications sent successfully"
+
+          # Send Slack notification when configured. Failures are logged but do not fail the workflow.
+          if [[ -n "$SLACK_WEBHOOK_URL" ]]; then
+            export STATUS MODE WEEK GRADE DATA_VERIFICATION FULL_LLM_RESPONSE DESCRIPTION RUN_URL SLACK_WEBHOOK_URL
+            if bash .github/scripts/slack-notify.sh; then
+              SLACK_STATUS="sent"
+            else
+              SLACK_STATUS="failed"
+              echo "::warning::Slack notification delivery failed"
+            fi
+          else
+            echo "ℹ️ Slack webhook not configured; skipping Slack notification"
+          fi
+
+          echo "📨 Notification delivery summary: Discord=$DISCORD_STATUS, Slack=$SLACK_STATUS"
+          if [[ "$DISCORD_STATUS" == "sent" || "$SLACK_STATUS" == "sent" ]]; then
+            echo "✅ One or more notifications sent successfully"
+          else
+            echo "⚠️ No notifications were sent"
+          fi
 
   # Create issues for failed intelligence operations
   create-intelligence-issue:

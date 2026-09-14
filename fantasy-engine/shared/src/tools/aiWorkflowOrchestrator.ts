@@ -662,6 +662,8 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
 
     let searchCount = 0;
     const maxSearches = parseInt(process.env.MAX_WEB_SEARCHES || '5');
+    const maxOutputTokens = parseInt(process.env.LLM_MAX_OUTPUT_TOKENS || '12000');
+    const maxSearchResultChars = parseInt(process.env.MAX_WEB_SEARCH_RESULT_CHARS || '3000');
     let totalCost = 0;
 
     // Start the conversation with tools available
@@ -681,7 +683,7 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
       try {
         response = await provider.chat(messages, {
           tools: [webSearchTool],
-          max_tokens: 4000,
+          max_tokens: maxOutputTokens,
           temperature: 0.7,
           tool_choice: 'auto'
         });
@@ -694,7 +696,7 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
             content: 'Tool/function calling failed for this provider. Continue without calling tools and provide the best analysis from the data already supplied.'
           }
         ], {
-          max_tokens: 4000,
+          max_tokens: maxOutputTokens,
           temperature: 0.7,
           tool_choice: 'none'
         });
@@ -745,7 +747,11 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
                 console.log(`  - Results length: ${searchResult.combinedText.length} chars`);
                 console.log(`  - Results preview: ${searchResult.combinedText.substring(0, 200)}...`);
                 console.log(`  - Sources: ${searchResult.sources.join(', ')}`);
-                toolResults += `\nWeb search results for "${query}":\n${searchResult.combinedText}\n`;
+                let resultText = searchResult.combinedText;
+                if (resultText.length > maxSearchResultChars) {
+                  resultText = `${resultText.substring(0, maxSearchResultChars)}\n\n[Search result truncated to ${maxSearchResultChars} chars to preserve final answer budget]`;
+                }
+                toolResults += `\nWeb search results for "${query}":\n${resultText}\n`;
               } else {
                 console.log(`  - Search failed: ${searchResult.error}`);
                 toolResults += `\nWeb search for "${query}" failed: ${searchResult.error}\n`;
@@ -789,7 +795,28 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
           console.log(`🛑 Max searches reached (${searchCount}/${maxSearches}) - treating as final`);
         }
         
-        finalResponse = response.content || 'Analysis completed.';
+        finalResponse = (response.content || '').trim();
+
+        if (!finalResponse && response.finish_reason === 'length') {
+          console.warn(`⚠️ LLM exhausted output budget without visible content; retrying final answer without tools using ${maxOutputTokens} tokens`);
+          const retryResponse = await provider.chat([
+            ...messages,
+            {
+              role: 'user',
+              content: 'Your previous response exhausted its output budget without visible text. Do not call any tools. Write the final actionable fantasy football analysis now, using the roster, FantasyPros rankings, and web search results already provided. Be concise but complete.'
+            }
+          ], {
+            max_tokens: maxOutputTokens,
+            temperature: 0.5,
+            tool_choice: 'none'
+          });
+
+          totalCost += (retryResponse.usage?.total_tokens || 0) * 0.000001;
+          finalResponse = (retryResponse.content || '').trim();
+          console.log(`📤 Retry response: content=${finalResponse.length} chars, finish=${retryResponse.finish_reason}, usage=${JSON.stringify(retryResponse.usage)}`);
+        }
+
+        finalResponse = finalResponse || 'Analysis failed: the LLM returned no visible final content after web search. Check workflow logs for tool-call details.';
         console.log(`✅ Final response received (${finalResponse.length} characters)`);
         console.log(`📊 Final response preview: ${finalResponse.substring(0, 200)}...`);
         break;
