@@ -454,7 +454,7 @@ Start your response with a section titled **ACTION CHECKLIST**. Use this exact s
    - If no lineup changes are recommended: "NO LINEUP CHANGES — keep current starters"
 
 2. **WAIVER CLAIMS TO SUBMIT**
-   - If a waiver/add move is recommended: "CLAIM: ADD [Player] ([Position], [NFL Team]) / DROP [Player] ([Position]) — Priority [1-3], Confidence [High/Med/Low]"
+   - If a waiver/add move is recommended: "CLAIM: ADD [Player] ([Position], [NFL Team]) / DROP [Player] ([Position]) — Priority [1-3], Confidence [High/Med/Low], Suggested FAAB bid [low-high]% of budget"
    - If no waiver claims are recommended: "NO WAIVER CLAIMS — hold roster"
 
 3. **DO NOT DROP / HOLD**
@@ -468,19 +468,22 @@ After the checklist, provide the detailed position-by-position explanation.
 **GIVE ME:**
 - WHO TO START at each position (with brief reason)
 - WHO TO BENCH (and why)
-- TOP 3 WAIVER PICKUPS to consider (if any) - **IMPORTANT: For each waiver pickup, specify WHO TO DROP from my current roster**
+- TOP 3 WAIVER PICKUPS to consider (if any) - **IMPORTANT: For each waiver pickup, specify WHO TO DROP from my current roster and a suggested FAAB bid range**
 - Never recommend NFL free agents, unsigned players, OUT/IR/DOUBTFUL/PUP/SUSPENDED players, or players not present in the actionable waiver list above.
 - Before listing a waiver pickup, sanity-check the move: confirm the add is actionable, compare against the proposed drop, quantify the projected-point gain when possible, and downgrade speculative stashes below immediate lineup upgrades unless the upside case is clearly stronger.
+- Include a practical FAAB bid range for every waiver recommendation as a percentage of total budget. Use conservative ranges unless the player is a clear immediate starter: 0-2% for speculative stashes, 3-6% for depth upgrades, 7-12% for likely weekly starters, 13-25% for major impact adds, and 25%+ only for rare league-winning players.
 - Any lineup swaps between starters and bench
 - **IR MOVES**: If any IR players are ready to return, specify WHO TO DROP from active roster to activate them
 
 **WAIVER WIRE FORMAT:**
 When recommending waiver pickups, use this format:
-"ADD [Player Name] ([Position]) - [Reason]
-DROP [Player Name] ([Position]) - [Why they're droppable]"
+"ADD [Player Name] ([Position], [NFL Team]) - [Reason]
+DROP [Player Name] ([Position]) - [Why they're droppable]
+FAAB BID RANGE: [low-high]% of budget - [why this range fits the urgency/upside]"
 
-Example: "ADD Mike Gesicki (TE) - Higher upside than current option
-DROP Brenton Strange (TE) - Lower projection and limited role"
+Example: "ADD Mike Gesicki (TE, CIN) - Higher upside than current option
+DROP Brenton Strange (TE) - Lower projection and limited role
+FAAB BID RANGE: 3-5% of budget - depth upgrade, not a must-win bidding war"
 
 **IR ACTIVATION FORMAT:**
 When recommending IR activations, use this format:
