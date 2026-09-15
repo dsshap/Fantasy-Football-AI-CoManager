@@ -248,10 +248,11 @@ program
 program
   .command('realtime')
   .description('Run real-time event monitoring and instant decisions')
-  .action(async () => {
+  .option('--week <number>', 'NFL week number')
+  .action(async (options) => {
     try {
       console.log('⚡ Running real-time intelligence...');
-      await runPhase4Mode('realtime');
+      await runPhase4Mode('realtime', options.week ? parseInt(options.week) : undefined);
     } catch (error: any) {
       console.error('❌ Real-time intelligence failed:', error.message);
       process.exit(1);
@@ -261,10 +262,11 @@ program
 program
   .command('learning')
   .description('Execute adaptive learning cycle')
-  .action(async () => {
+  .option('--week <number>', 'NFL week number')
+  .action(async (options) => {
     try {
       console.log('🧠 Running adaptive learning...');
-      await runPhase4Mode('learning');
+      await runPhase4Mode('learning', options.week ? parseInt(options.week) : undefined);
     } catch (error: any) {
       console.error('❌ Adaptive learning failed:', error.message);
       process.exit(1);
@@ -274,10 +276,11 @@ program
 program
   .command('analytics')
   .description('Generate advanced analytics dashboard')
-  .action(async () => {
+  .option('--week <number>', 'NFL week number')
+  .action(async (options) => {
     try {
       console.log('📊 Generating analytics dashboard...');
-      await runPhase4Mode('analytics');
+      await runPhase4Mode('analytics', options.week ? parseInt(options.week) : undefined);
     } catch (error: any) {
       console.error('❌ Analytics generation failed:', error.message);
       process.exit(1);
@@ -287,10 +290,11 @@ program
 program
   .command('seasonal')
   .description('Process multi-season intelligence')
-  .action(async () => {
+  .option('--week <number>', 'NFL week number')
+  .action(async (options) => {
     try {
       console.log('🔮 Processing seasonal intelligence...');
-      await runPhase4Mode('seasonal');
+      await runPhase4Mode('seasonal', options.week ? parseInt(options.week) : undefined);
     } catch (error: any) {
       console.error('❌ Seasonal intelligence failed:', error.message);
       process.exit(1);

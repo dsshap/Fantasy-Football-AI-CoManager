@@ -74,9 +74,15 @@ export function validateEnvironment(): {
   };
 }
 
+export function getCurrentNFLSeasonYear(): number {
+  const now = new Date();
+  return now.getMonth() <= 1 ? now.getFullYear() - 1 : now.getFullYear();
+}
+
 export function getCurrentWeek(): number {
   const now = new Date();
-  const seasonStart = new Date('2025-09-04'); // 2025 NFL season start
+  const seasonYear = getCurrentNFLSeasonYear();
+  const seasonStart = new Date(`${seasonYear}-09-04T00:00:00Z`); // Approximate NFL Week 1 start
   const timeDiff = now.getTime() - seasonStart.getTime();
   const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
 

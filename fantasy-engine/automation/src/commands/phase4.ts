@@ -6,7 +6,7 @@ import {
 } from '@fantasy-ai/shared';
 import { loadProductionConfig } from '../config/production.js';
 import { writeFileSync } from 'fs';
-import { getCurrentWeek } from '../utils/environment.js';
+import { getCurrentNFLSeasonYear, getCurrentWeek } from '../utils/environment.js';
 
 export interface Phase4Options {
   mode?: 'full' | 'realtime' | 'learning' | 'analytics' | 'seasonal';
@@ -502,10 +502,10 @@ function printPhase4Summary(result: Phase4Result): void {
 /**
  * Run specific Phase 4 intelligence mode
  */
-export async function runPhase4Mode(mode: 'realtime' | 'learning' | 'analytics' | 'seasonal'): Promise<void> {
-  console.log(`🎯 Running Phase 4 ${mode} intelligence...`);
+export async function runPhase4Mode(mode: 'realtime' | 'learning' | 'analytics' | 'seasonal', week?: number): Promise<void> {
+  console.log(`🎯 Running Phase 4 ${mode} intelligence${week ? ` for Week ${week}` : ''}...`);
   
-  const result = await executePhase4Intelligence({ mode });
+  const result = await executePhase4Intelligence({ mode, week });
   
   console.log(`✅ Phase 4 ${mode} intelligence complete`);
   console.log(`📈 Grade: ${result.performance_grade}`);
@@ -584,7 +584,8 @@ async function runFullAnalysis(config: any, week: number): Promise<any> {
       // Get comprehensive roster data
       const roster = await getMyRoster({ 
         leagueId: league.id, 
-        teamId: league.teamId 
+        teamId: league.teamId,
+        week
       });
       
       // Run full AI analysis with detailed prompting
@@ -596,12 +597,16 @@ async function runFullAnalysis(config: any, week: number): Promise<any> {
           name: league.name
         }],
         week: week,
-        prompt: `You are an expert fantasy football analyst helping me win my ${league.name} championship.
+        prompt: `You are an expert fantasy football analyst helping me make the best Week ${week} lineup and waiver decisions for ${league.name}.
 
 CURRENT SITUATION:
-- Week ${week} of the NFL season
+- Current date: ${new Date().toISOString()}
+- NFL season year: ${getCurrentNFLSeasonYear()}
+- Target fantasy week: ${week}
 - You have access to my current roster data above
 - You have access to a web_search tool for current information
+- Do NOT discuss playoffs, teams resting starters, win-and-in scenarios, or championship-week logic unless the target fantasy week is 17 or 18 and a current dated source explicitly confirms it.
+- Ignore search results from other weeks or seasons.
 
 IMPORTANT INSTRUCTIONS FOR WEB SEARCH:
 - You MUST use the web_search tool to get current information before making recommendations
@@ -667,7 +672,8 @@ async function runRealtimeAnalysis(config: any, week: number): Promise<any> {
       // Quick roster check - no full analysis
       const roster = await getMyRoster({ 
         leagueId: league.id, 
-        teamId: league.teamId 
+        teamId: league.teamId,
+        week
       });
       
       // Lightweight real-time analysis
@@ -680,6 +686,11 @@ async function runRealtimeAnalysis(config: any, week: number): Promise<any> {
         }],
         week: week,
         prompt: `URGENT: Real-time fantasy emergency check for ${league.name} - Week ${week}
+
+Current date: ${new Date().toISOString()}
+NFL season year: ${getCurrentNFLSeasonYear()}
+Target fantasy week: ${week}
+Ignore search results from other weeks/seasons. Do not discuss playoffs or resting starters unless Week is 17/18 and a current dated source explicitly confirms it.
 
 You are monitoring my roster for breaking news that requires immediate action. Use web_search to quickly check for:
 
@@ -731,7 +742,8 @@ async function runAnalyticsAnalysis(config: any, week: number): Promise<any> {
     try {
       const roster = await getMyRoster({ 
         leagueId: league.id, 
-        teamId: league.teamId 
+        teamId: league.teamId,
+        week
       });
       
       // Analytics-focused analysis
@@ -744,6 +756,13 @@ async function runAnalyticsAnalysis(config: any, week: number): Promise<any> {
         }],
         week: week,
         prompt: `You are a data-driven fantasy analyst specializing in waiver wire opportunities and performance metrics for ${league.name} - Week ${week}.
+
+CURRENT ANALYSIS SCOPE:
+- Current date: ${new Date().toISOString()}
+- NFL season year: ${getCurrentNFLSeasonYear()}
+- Target fantasy week: ${week}
+- Ignore search results from other weeks or seasons.
+- Do NOT discuss playoffs, teams resting starters, win-and-in scenarios, or championship-week logic unless the target fantasy week is 17 or 18 and a current dated source explicitly confirms it.
 
 ANALYTICAL MISSION:
 Use web_search to uncover statistical trends and hidden opportunities that other managers might miss. Focus on data-driven insights rather than conventional wisdom.

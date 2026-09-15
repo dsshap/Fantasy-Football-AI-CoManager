@@ -277,7 +277,7 @@ jobs:
               ;;
             "analytics")
               echo "📊 Generating advanced analytics dashboard..."
-              node dist/cli.js analytics
+              node dist/cli.js intelligence --mode analytics --week $CURRENT_WEEK
               ;;
             "seasonal")
               echo "🔮 Processing multi-season intelligence..."

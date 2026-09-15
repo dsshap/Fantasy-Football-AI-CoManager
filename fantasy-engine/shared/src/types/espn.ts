@@ -13,6 +13,7 @@ export interface Player {
   points: number;
   projectedPoints?: number;
   seasonProjectedPoints?: number;
+  projectionSource?: 'weekly' | 'season_estimate' | 'fallback' | 'none';
   injuryStatus?: string;
   percentStarted?: number;
   percentOwned?: number;

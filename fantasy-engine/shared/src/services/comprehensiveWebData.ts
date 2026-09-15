@@ -1,6 +1,7 @@
 // Comprehensive Web Data Service - Combines enhanced search, RSS feeds, and fantasy optimizations
 import { EnhancedWebSearch, WebSearchResult, SearchConfig } from './enhancedWebSearch.js';
 import { FantasyRSSAggregator, RSSItem } from './fantasyRSSAggregator.js';
+import { getCurrentNFLSeasonYear } from './espnApi.js';
 
 export interface ComprehensiveResult {
   success: boolean;
@@ -265,7 +266,7 @@ export class ComprehensiveWebData {
     console.log('🎯 Handling waiver wire query...');
     
     // Enhance query for waiver wire searches
-    const enhancedQuery = `${query} waiver wire targets pickups add drops 2025`;
+    const enhancedQuery = `${query} waiver wire targets pickups add drops ${getCurrentNFLSeasonYear()}`;
     
     const searchResult = await this.enhancedSearch.search(enhancedQuery);
     const rssSearch = await this.rssAggregator.searchFantasyNews('waiver wire', 5);
@@ -302,7 +303,7 @@ export class ComprehensiveWebData {
   private async handleMatchupQuery(query: string): Promise<ComprehensiveResult> {
     console.log('⚔️ Handling matchup query...');
     
-    const enhancedQuery = `${query} start sit matchup analysis rankings 2025`;
+    const enhancedQuery = `${query} start sit matchup analysis rankings ${getCurrentNFLSeasonYear()}`;
     return await this.comprehensiveSearch(enhancedQuery);
   }
 

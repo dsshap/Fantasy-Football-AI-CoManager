@@ -1,5 +1,6 @@
 // Enhanced web search service with multiple providers and fantasy football optimizations
 import axios from 'axios';
+import { getCurrentNFLSeasonYear } from './espnApi.js';
 
 export interface WebSearchResult {
   success: boolean;
@@ -102,7 +103,7 @@ export class EnhancedWebSearch {
     const lowerQuery = query.toLowerCase();
     
     // Add current year for recent info
-    const currentYear = new Date().getFullYear();
+    const currentYear = getCurrentNFLSeasonYear();
     if (!lowerQuery.includes(currentYear.toString()) && !lowerQuery.includes((currentYear - 1).toString())) {
       query += ` ${currentYear}`;
     }

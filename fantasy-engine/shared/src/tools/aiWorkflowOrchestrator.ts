@@ -1,4 +1,4 @@
-import { espnApi } from '../services/espnApi.js';
+import { espnApi, getCurrentNFLSeasonYear } from '../services/espnApi.js';
 import { fantasyProsApi } from '../services/fantasyProsApi.js';
 import { llmConfig } from '../config/llm-config.js';
 import { configuredComprehensiveWebData } from '../services/comprehensiveWebData.js';
@@ -47,7 +47,7 @@ export async function executeAIWorkflow(args: {
       leagues.map(async (league) => {
         try {
           console.log(`📋 Fetching roster for ${league.name || league.leagueId}...`);
-          const roster = await espnApi.getTeamRoster(league.leagueId, league.teamId);
+          const roster = await espnApi.getTeamRoster(league.leagueId, league.teamId, week);
           console.log(`📊 Roster fetched - Starters: ${roster.starters?.length || 0}, Bench: ${roster.bench?.length || 0}`);
           const leagueInfo = await espnApi.getLeagueInfo(league.leagueId);
           console.log(`🏈 League info: ${leagueInfo?.name || 'Unknown'}`);
@@ -59,7 +59,8 @@ export async function executeAIWorkflow(args: {
           // Fetch waiver wire data too
           const rosterWithWaivers = await getMyRoster({ 
             leagueId: league.leagueId, 
-            teamId: league.teamId 
+            teamId: league.teamId,
+            week
           });
           
           // VALIDATION: Fix weekly projections and IR classification before sending to LLM
@@ -216,6 +217,15 @@ FANTASY ANALYSIS GUIDELINES:
 
     const enhancedPrompt = `${prompt}
 
+CURRENT ANALYSIS SCOPE:
+- Current date: ${new Date().toISOString()}
+- NFL season year: ${getCurrentNFLSeasonYear()}
+- Target fantasy week: ${week}
+- Roster, projections, waiver, and search results must all be interpreted for Target fantasy week ${week}.
+- Do NOT discuss playoffs, teams resting starters, win-and-in scenarios, or championship-week logic unless Target fantasy week is 17 or 18 and a current dated source explicitly confirms it.
+- Ignore search results from other weeks or seasons; if search results conflict with the target week, say they are stale and do not use them.
+- Treat values labeled "Projected Week ${week}" as projections, not prior-week actual scores.
+
 CURRENT ROSTER DATA:
 ${leagueData.map(league => `
 ${league.leagueName} (Team Name: ${league.teamName?.replace(/\d/g, (d: string) => ['zero','one','two','three','four','five','six','seven','eight','nine'][parseInt(d)])}):
@@ -240,12 +250,12 @@ ${league.starters.map((p: any) => {
     else if (weeklyPts < 25) weeklyCategory = 'High';
     else weeklyCategory = 'Very High';
     
-    projDesc = `Week ${weeklyCategory} (${weeklyInWords} pts)`;
+    projDesc = `Projected Week ${week} ${weeklyCategory} (${weeklyInWords} pts)`;
     
     // Add season total if available and different
     if (seasonPts && seasonPts > 0 && Math.abs(seasonPts - weeklyPts) > 10) {
       const seasonInWords = seasonPts.toFixed(1).replace(/\d/g, (d: string) => ['zero','one','two','three','four','five','six','seven','eight','nine'][parseInt(d)]);
-      projDesc += ` | Season (${seasonInWords} total)`;
+      projDesc += ` | Season projection (${seasonInWords} total)`;
     }
   }
   
@@ -301,7 +311,7 @@ ${league.bench.map((p: any) => {
     else if (pts < 50) category = 'Very High';
     else category = 'Season-total';
     
-    projDesc = `${category} (${ptsInWords} points)`;
+    projDesc = `Projected Week ${week} ${category} (${ptsInWords} points)`;
   }
   
   let ownedDesc = 'Unknown ownership';
@@ -353,7 +363,7 @@ ${league.injuredReserve && league.injuredReserve.length > 0 ? league.injuredRese
     else if (pts < 25) category = 'High';
     else category = 'Very High';
     
-    projDesc = `${category} (${ptsInWords} pts)`;
+    projDesc = `Projected Week ${week} ${category} (${ptsInWords} pts)`;
   }
   
   let ownedDesc = 'Unknown ownership';
@@ -397,7 +407,7 @@ ${league.availablePlayers ? Object.entries(league.availablePlayers).map(([positi
       else if (pts < 25) category = 'High';
       else category = 'Very High';
       
-      projDesc = `${category} (${ptsInWords} pts)`;
+      projDesc = `Projected Week ${week} ${category} (${ptsInWords} pts)`;
     }
     
     let ownedDesc = 'Available';
@@ -455,7 +465,7 @@ DROP [Player Name] ([Position]) - [Why they're droppable to make room]"
 Example: "ACTIVATE Cooper Kupp (WR) from IR - Expected to play this week, cleared injury report
 DROP Tyler Lockett (WR) - Inconsistent production and tough schedule"
 
-Use web_search() to check for any breaking injury news, weather concerns, or lineup changes that could affect my decisions.`;
+Use web_search() to check for any breaking injury news, weather concerns, or lineup changes that could affect my decisions. Search only for Week ${week} / ${getCurrentNFLSeasonYear()} context, and reject stale results from other weeks/seasons.`;
 
     console.log('🧠 Generating analysis with real LLM...');
     
@@ -483,7 +493,7 @@ Use web_search() to check for any breaking injury news, weather concerns, or lin
     console.log('📝 ========== LLM PROMPT END ==========\n');
     
     // Use LLM with web search tool calling capability
-    const llmResponse = await generateResponseWithWebSearchTools(enhancedPrompt);
+    const llmResponse = await generateResponseWithWebSearchTools(enhancedPrompt, week);
     
     // Log the LLM response for debugging
     console.log('\n🤖 ========== LLM RESPONSE (WITH TOOL CALLING) START ==========');
@@ -600,10 +610,32 @@ async function generateMockAnalysis(prompt: string, leagueData: any[]): Promise<
   };
 }
 
+function filterSearchResultsForTargetWeek(results: string, targetWeek: number): string {
+  const mismatchedWeekPattern = /\bweek\s+(\d{1,2})\b/i;
+  const earlySeason = targetWeek < 17;
+  const filteredLines = results.split('\n').filter(line => {
+    const match = line.match(mismatchedWeekPattern);
+    if (match && parseInt(match[1], 10) !== targetWeek) return false;
+
+    if (earlySeason && /\b(resting starters|rest starters|locked into|playoff scenarios?|win-and-in|championship week|week 18)\b/i.test(line)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const filtered = filteredLines.join('\n').trim();
+  if (!filtered) {
+    return `Search results were discarded because they did not match Target Week ${targetWeek} or appeared to be stale late-season/playoff content.`;
+  }
+
+  return filtered;
+}
+
 /**
  * Generate LLM response with web search tool calling capability
  */
-async function generateResponseWithWebSearchTools(prompt: string): Promise<{ content: string; cost?: number; searches_performed?: number }> {
+async function generateResponseWithWebSearchTools(prompt: string, targetWeek: number): Promise<{ content: string; cost?: number; searches_performed?: number }> {
   try {
     // Define the web search tool that LLM can call
     const webSearchTool = {
@@ -747,7 +779,7 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
                 console.log(`  - Results length: ${searchResult.combinedText.length} chars`);
                 console.log(`  - Results preview: ${searchResult.combinedText.substring(0, 200)}...`);
                 console.log(`  - Sources: ${searchResult.sources.join(', ')}`);
-                let resultText = searchResult.combinedText;
+                let resultText = filterSearchResultsForTargetWeek(searchResult.combinedText, targetWeek);
                 if (resultText.length > maxSearchResultChars) {
                   resultText = `${resultText.substring(0, maxSearchResultChars)}\n\n[Search result truncated to ${maxSearchResultChars} chars to preserve final answer budget]`;
                 }
@@ -770,7 +802,7 @@ async function generateResponseWithWebSearchTools(prompt: string): Promise<{ con
         console.log(`🔄 Tool execution completed, adding results to conversation`);
         if (toolResults) {
           console.log(`✅ Tool results available: ${toolResults.length} chars`);
-          const userMessage = `🔍 CURRENT WEB SEARCH RESULTS:\n${toolResults}\n\n📋 INSTRUCTIONS: Now provide your complete fantasy analysis incorporating this current information. Be specific about how the search results impact your recommendations. If the search results don't provide useful information for fantasy decisions, acknowledge that and proceed with your analysis based on the roster data and expert rankings provided.`;
+          const userMessage = `🔍 CURRENT WEB SEARCH RESULTS:\n${toolResults}\n\n📋 INSTRUCTIONS: Now provide your complete fantasy analysis for Target Week ${targetWeek}. Incorporate only current information that matches Target Week ${targetWeek} and the current season. If search results mention a different week/season, playoffs, resting starters, or championship week when Target Week is not 17/18, explicitly ignore them as stale. Be specific about how valid search results impact your recommendations. If the search results don't provide useful information for fantasy decisions, acknowledge that and proceed with your analysis based on the roster data and expert rankings provided.`;
           messages.push({ 
             role: 'user', 
             content: userMessage
