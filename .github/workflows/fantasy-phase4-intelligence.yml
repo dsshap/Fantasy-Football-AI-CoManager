@@ -6,17 +6,17 @@ on:
   # - September to early November: EDT (UTC-4)
   # - Early November to January: EST (UTC-5)
   schedule:
-    # Season-Aware Daily Analysis - 8 AM Eastern, NFL season only (Sep-Jan)
+    # Season-Aware Daily Analysis - around 9 AM EDT / 8 AM EST, NFL season only (Sep-Jan)
     # Runs during months 9-12 and 1 (September through January)
-    - cron: '0 13 * 9-12,1 *'
+    - cron: '17 13 * 9-12,1 *'
     
     # Game Day Monitoring - Every 4 hours on game days (Sun/Mon/Thu) during NFL season
-    # Runs at 12AM, 4AM, 8AM, 12PM, 4PM, 8PM UTC (avoiding 1 PM UTC daily run)
-    - cron: '0 0,4,8,12,16,20 * 9-12,1 0,1,4'
+    # Runs at 00:23, 04:23, 08:23, 12:23, 16:23, 20:23 UTC (avoids top-of-hour congestion)
+    - cron: '23 0,4,8,12,16,20 * 9-12,1 0,1,4'
     
-    # Weekly Waiver Analysis - Tuesday 10 AM Eastern during NFL season
+    # Weekly Waiver Analysis - Tuesday around 10 AM EDT / 9 AM EST during NFL season
     # Essential for waiver wire decisions
-    - cron: '0 14 * 9-12,1 2'
+    - cron: '29 14 * 9-12,1 2'
   
   # Manual triggers
   workflow_dispatch:
@@ -105,17 +105,11 @@ jobs:
           # Determine intelligence mode based on trigger
           if [[ "${{ github.event.inputs.intelligence_mode }}" != "" ]]; then
             INTEL_MODE="${{ github.event.inputs.intelligence_mode }}"
-          elif [[ "${{ github.event.schedule }}" == "0 12 * * *" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "17 13 * 9-12,1 *" ]]; then
             INTEL_MODE="full"
-          elif [[ "${{ github.event.schedule }}" == "0 */2 * * 0,1,4" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "23 0,4,8,12,16,20 * 9-12,1 0,1,4" ]]; then
             INTEL_MODE="realtime"
-          elif [[ "${{ github.event.schedule }}" == "0 16 * * 0" ]]; then
-            INTEL_MODE="full"
-          elif [[ "${{ github.event.schedule }}" == "0 23 * * 4" ]]; then
-            INTEL_MODE="full"
-          elif [[ "${{ github.event.schedule }}" == "0 23 * * 1" ]]; then
-            INTEL_MODE="full"
-          elif [[ "${{ github.event.schedule }}" == "0 14 * * 2" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "29 14 * 9-12,1 2" ]]; then
             INTEL_MODE="analytics"
           else
             INTEL_MODE="full"
