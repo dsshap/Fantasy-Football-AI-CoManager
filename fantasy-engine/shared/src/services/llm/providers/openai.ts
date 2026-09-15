@@ -57,6 +57,11 @@ export class OpenAIProvider extends BaseLLMProvider {
         temperature: options?.temperature || this.config.temperature || 0.7
       };
 
+      if (this.config.reasoning_effort) {
+        requestOptions.reasoning_effort = this.config.reasoning_effort;
+        console.log(`🧠 OpenAI-compatible reasoning_effort requested: ${this.config.reasoning_effort}`);
+      }
+
       // Add tools if provided
       if (options?.tools && options.tools.length > 0) {
         requestOptions.tools = this.convertTools(options.tools);
@@ -73,7 +78,27 @@ export class OpenAIProvider extends BaseLLMProvider {
         }
       }
 
-      const response = await this.client.chat.completions.create(requestOptions);
+      let response;
+      let reasoningEffortAccepted = false;
+      try {
+        response = await this.client.chat.completions.create(requestOptions);
+        reasoningEffortAccepted = !!requestOptions.reasoning_effort;
+        if (reasoningEffortAccepted) {
+          console.log(`✅ OpenAI-compatible reasoning_effort accepted by provider: ${requestOptions.reasoning_effort}`);
+        }
+      } catch (error: any) {
+        const maybeUnsupportedReasoning = requestOptions.reasoning_effort &&
+          (error.status === 400 || error.code === 'unsupported_parameter' || error.type === 'invalid_request_error') &&
+          /reasoning_effort|unsupported|unknown|unrecognized/i.test(error.message || '');
+
+        if (!maybeUnsupportedReasoning) {
+          throw error;
+        }
+
+        console.warn(`⚠️ OpenAI-compatible provider rejected reasoning_effort=${requestOptions.reasoning_effort}; retrying without it. Setting did NOT take effect for this call.`);
+        delete requestOptions.reasoning_effort;
+        response = await this.client.chat.completions.create(requestOptions);
+      }
       const responseTime = Date.now() - startTime;
 
       const message = response.choices[0]?.message;
@@ -104,7 +129,9 @@ export class OpenAIProvider extends BaseLLMProvider {
         metadata: {
           provider: this.name,
           model: this.config.model,
-          response_time_ms: responseTime
+          response_time_ms: responseTime,
+          reasoning_effort_requested: this.config.reasoning_effort,
+          reasoning_effort_accepted: reasoningEffortAccepted
         }
       };
     });

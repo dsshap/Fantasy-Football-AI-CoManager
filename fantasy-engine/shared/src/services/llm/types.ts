@@ -48,6 +48,7 @@ export interface LLMConfig {
   temperature?: number;
   base_url?: string; // For custom endpoints
   disable_tools?: boolean; // Omit tool/function calling for providers that do not support it
+  reasoning_effort?: 'low' | 'medium' | 'high' | string; // OpenAI-compatible reasoning effort, when supported
 }
 
 export interface LLMProvider {
