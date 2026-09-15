@@ -446,8 +446,27 @@ Review the roster like we're sitting together planning this week's lineup. Go po
 
 7. **INJURED RESERVE (IR)**: Check my IR players' injury status. Are any eligible to return from IR? If so, recommend WHO TO DROP from active roster to make room.
 
+**OUTPUT FORMAT — MAKE THE ACTIONS OBVIOUS:**
+Start your response with a section titled **ACTION CHECKLIST**. Use this exact structure and keep it concise:
+
+1. **LINEUP MOVES TO MAKE NOW**
+   - If a lineup change is recommended: "MOVE: START [Player] at [slot] over [Player] — [short reason]"
+   - If no lineup changes are recommended: "NO LINEUP CHANGES — keep current starters"
+
+2. **WAIVER CLAIMS TO SUBMIT**
+   - If a waiver/add move is recommended: "CLAIM: ADD [Player] ([Position], [NFL Team]) / DROP [Player] ([Position]) — Priority [1-3], Confidence [High/Med/Low]"
+   - If no waiver claims are recommended: "NO WAIVER CLAIMS — hold roster"
+
+3. **DO NOT DROP / HOLD**
+   - List valuable players who should not be dropped despite low projections or bench status.
+
+4. **MONITOR BEFORE LOCK**
+   - List injury/news/weather items to re-check before kickoff.
+
+After the checklist, provide the detailed position-by-position explanation.
+
 **GIVE ME:**
-- WHO TO START at each position (with brief reason)  
+- WHO TO START at each position (with brief reason)
 - WHO TO BENCH (and why)
 - TOP 3 WAIVER PICKUPS to consider (if any) - **IMPORTANT: For each waiver pickup, specify WHO TO DROP from my current roster**
 - Never recommend NFL free agents, unsigned players, OUT/IR/DOUBTFUL/PUP/SUSPENDED players, or players not present in the actionable waiver list above.
