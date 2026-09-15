@@ -225,6 +225,7 @@ CURRENT ANALYSIS SCOPE:
 - Do NOT discuss playoffs, teams resting starters, win-and-in scenarios, or championship-week logic unless Target fantasy week is 17 or 18 and a current dated source explicitly confirms it.
 - Ignore search results from other weeks or seasons; if search results conflict with the target week, say they are stale and do not use them.
 - Treat values labeled "Projected Week ${week}" as projections, not prior-week actual scores.
+- Think deeply before making recommendations: internally compare each add/drop/start/sit against player availability, NFL team status, injury status, projection delta, role/news confidence, roster construction, opportunity cost, and whether the move is reversible. Do not expose chain-of-thought; include only a concise rationale and confidence caveat for each recommendation.
 
 CURRENT ROSTER DATA:
 ${leagueData.map(league => `
@@ -450,6 +451,7 @@ Review the roster like we're sitting together planning this week's lineup. Go po
 - WHO TO BENCH (and why)
 - TOP 3 WAIVER PICKUPS to consider (if any) - **IMPORTANT: For each waiver pickup, specify WHO TO DROP from my current roster**
 - Never recommend NFL free agents, unsigned players, OUT/IR/DOUBTFUL/PUP/SUSPENDED players, or players not present in the actionable waiver list above.
+- Before listing a waiver pickup, sanity-check the move: confirm the add is actionable, compare against the proposed drop, quantify the projected-point gain when possible, and downgrade speculative stashes below immediate lineup upgrades unless the upside case is clearly stronger.
 - Any lineup swaps between starters and bench
 - **IR MOVES**: If any IR players are ready to return, specify WHO TO DROP from active roster to activate them
 
