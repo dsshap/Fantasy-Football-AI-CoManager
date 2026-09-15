@@ -391,6 +391,7 @@ ${league.injuredReserve && league.injuredReserve.length > 0 ? league.injuredRese
 }).join('\n') : 'No players on injured reserve'}
 
 AVAILABLE WAIVER WIRE/FREE AGENT PLAYERS BY POSITION:
+Only recommend players listed here. This list excludes NFL free agents and players marked OUT/IR/DOUBTFUL/PUP/SUSPENDED. If a player is not listed here, assume they are not actionable unless explicitly shown elsewhere as active and on an NFL team.
 ${league.availablePlayers ? Object.entries(league.availablePlayers).map(([position, players]: [string, any[]]) => 
   `${position}: ${players.length > 0 ? players.map((p: any) => {
     // Format waiver wire players similar to roster players
@@ -417,7 +418,9 @@ ${league.availablePlayers ? Object.entries(league.availablePlayers).map(([positi
       ownedDesc = `${ownedInWords}% owned`;
     }
     
-    return `• ${p.fullName} - ${projDesc} | ${ownedDesc}`;
+    const teamDesc = p.team ? ` | NFL team: ${p.team}` : '';
+    const injuryDesc = p.injuryStatus ? ` | Injury/status: ${p.injuryStatus}` : '';
+    return `• ${p.fullName} (${p.position}) - ${projDesc} | ${ownedDesc}${teamDesc}${injuryDesc}`;
   }).join('\n') : 'None available'}`
 ).join('\n') : 'Waiver wire data not available'}
 `).join('\n')}
@@ -446,6 +449,7 @@ Review the roster like we're sitting together planning this week's lineup. Go po
 - WHO TO START at each position (with brief reason)  
 - WHO TO BENCH (and why)
 - TOP 3 WAIVER PICKUPS to consider (if any) - **IMPORTANT: For each waiver pickup, specify WHO TO DROP from my current roster**
+- Never recommend NFL free agents, unsigned players, OUT/IR/DOUBTFUL/PUP/SUSPENDED players, or players not present in the actionable waiver list above.
 - Any lineup swaps between starters and bench
 - **IR MOVES**: If any IR players are ready to return, specify WHO TO DROP from active roster to activate them
 

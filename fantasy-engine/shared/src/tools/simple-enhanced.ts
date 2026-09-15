@@ -1,5 +1,25 @@
 // Minimal roster tool for testing
 import { espnApi } from '../services/espnApi.js';
+import { Player } from '../types/espn.js';
+
+function isActiveNFLPlayer(player: Player): boolean {
+  return !!player.team && player.team !== 'FA' && !player.team.startsWith('UNKNOWN');
+}
+
+function isUnavailableForWaivers(player: Player): boolean {
+  const status = (player.injuryStatus || '').toUpperCase();
+  return status.includes('OUT') ||
+    status.includes('IR') ||
+    status.includes('INJURED_RESERVE') ||
+    status.includes('DOUBTFUL') ||
+    status.includes('PUP') ||
+    status.includes('NFI') ||
+    status.includes('SUSPEND');
+}
+
+function isActionableWaiverPlayer(player: Player): boolean {
+  return isActiveNFLPlayer(player) && !isUnavailableForWaivers(player);
+}
 
 export async function getMyRoster(args: { leagueId: string; teamId: string; week?: number }) {
   const { leagueId, teamId, week } = args;
@@ -17,31 +37,35 @@ export async function getMyRoster(args: { leagueId: string; teamId: string; week
   // Get available players (waiver wire + free agents)
   console.log(`🔍 Fetching available players from waiver wire...`);
   const availablePlayers = await espnApi.getAvailablePlayers(leagueId, week);
-  console.log(`✅ Available players fetched: ${availablePlayers.length} total`);
+  const actionableAvailablePlayers = availablePlayers.filter(isActionableWaiverPlayer);
+  const excludedPlayers = availablePlayers.length - actionableAvailablePlayers.length;
+  console.log(`✅ Available players fetched: ${availablePlayers.length} total (${actionableAvailablePlayers.length} actionable, ${excludedPlayers} excluded as NFL FA/unavailable)`);
   
-  // Sort and filter available players by position and relevance
+  // Sort and filter actionable waiver players by position and relevance.
+  // Excludes NFL free agents and OUT/IR/suspended players so the LLM cannot
+  // recommend non-actionable names like unsigned veterans or season-ending injuries.
   const topAvailableByPosition: Record<string, any[]> = {
-    QB: availablePlayers
+    QB: actionableAvailablePlayers
       .filter(p => p.position === 'QB')
       .sort((a, b) => (b.projectedPoints || 0) - (a.projectedPoints || 0))
       .slice(0, 5), // Top 5 QBs
-    RB: availablePlayers
+    RB: actionableAvailablePlayers
       .filter(p => p.position === 'RB') 
       .sort((a, b) => (b.projectedPoints || 0) - (a.projectedPoints || 0))
       .slice(0, 8), // Top 8 RBs
-    WR: availablePlayers
+    WR: actionableAvailablePlayers
       .filter(p => p.position === 'WR')
       .sort((a, b) => (b.projectedPoints || 0) - (a.projectedPoints || 0))
       .slice(0, 8), // Top 8 WRs  
-    TE: availablePlayers
+    TE: actionableAvailablePlayers
       .filter(p => p.position === 'TE')
       .sort((a, b) => (b.projectedPoints || 0) - (a.projectedPoints || 0))
       .slice(0, 5), // Top 5 TEs
-    'D/ST': availablePlayers
+    'D/ST': actionableAvailablePlayers
       .filter(p => p.position === 'D/ST')
       .sort((a, b) => (b.projectedPoints || 0) - (a.projectedPoints || 0))
       .slice(0, 5), // Top 5 defenses
-    K: availablePlayers
+    K: actionableAvailablePlayers
       .filter(p => p.position === 'K')
       .sort((a, b) => (b.projectedPoints || 0) - (a.projectedPoints || 0))
       .slice(0, 5) // Top 5 kickers
