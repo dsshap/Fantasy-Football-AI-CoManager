@@ -1,0 +1,20 @@
+name: Scheduler Heartbeat Debug
+
+on:
+  # TEMP DEBUG: cheap heartbeat to verify whether GitHub scheduled workflows fire in this repo.
+  # Remove after scheduler diagnosis.
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Print scheduler heartbeat
+        run: |
+          echo "Scheduler heartbeat fired"
+          echo "event=${{ github.event_name }}"
+          echo "schedule=${{ github.event.schedule }}"
+          date -u
