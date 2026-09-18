@@ -8,9 +8,9 @@ on:
   # - September to early November: EDT (UTC-4)
   # - Early November to January: EST (UTC-5)
   schedule:
-    # TEMP DEBUG: daily analysis moved near current UTC time to verify GitHub scheduler fires.
+    # TEMP DEBUG: run every 5 minutes to verify GitHub scheduler fires.
     # Restore to '17 13 * * *' after scheduler verification.
-    - cron: '13 14 * * *'
+    - cron: '*/5 * * * *'
     
     # Game Day Monitoring - Every 4 hours on game days (Sun/Mon/Thu)
     # Runs at 00:23, 04:23, 08:23, 12:23, 16:23, 20:23 UTC (avoids top-of-hour congestion)
@@ -108,7 +108,7 @@ jobs:
           # Determine intelligence mode based on trigger
           if [[ "${{ github.event.inputs.intelligence_mode }}" != "" ]]; then
             INTEL_MODE="${{ github.event.inputs.intelligence_mode }}"
-          elif [[ "${{ github.event.schedule }}" == "13 14 * * *" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "*/5 * * * *" ]]; then
             INTEL_MODE="full"
           elif [[ "${{ github.event.schedule }}" == "23 0,4,8,12,16,20 * * 0,1,4" ]]; then
             INTEL_MODE="realtime"
