@@ -1,0 +1,20 @@
+{
+  "name": "fantasy-football-inngest-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Inngest scheduler that dispatches the original fantasy football GitHub Actions workflow.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "inngest": "^3.35.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^5.3.12",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
