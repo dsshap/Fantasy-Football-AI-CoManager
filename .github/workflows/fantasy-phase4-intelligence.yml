@@ -1,22 +1,23 @@
 name: Fantasy Football Phase 4 - Advanced Intelligence
 
 on:
-  # Optimized scheduled runs for NFL season only (September-January)
+  # Scheduled runs use simple all-month cron expressions because GitHub's scheduler
+  # has been unreliable with mixed month fields like `9-12,1`. NFL-season gating
+  # happens in the preflight job below instead.
   # NOTE: GitHub Actions uses UTC time. During NFL season (Sep-Jan):
   # - September to early November: EDT (UTC-4)
   # - Early November to January: EST (UTC-5)
   schedule:
-    # Season-Aware Daily Analysis - around 9 AM EDT / 8 AM EST, NFL season only (Sep-Jan)
-    # Runs during months 9-12 and 1 (September through January)
-    - cron: '17 13 * 9-12,1 *'
+    # Season-Aware Daily Analysis - around 9 AM EDT / 8 AM EST
+    - cron: '17 13 * * *'
     
-    # Game Day Monitoring - Every 4 hours on game days (Sun/Mon/Thu) during NFL season
+    # Game Day Monitoring - Every 4 hours on game days (Sun/Mon/Thu)
     # Runs at 00:23, 04:23, 08:23, 12:23, 16:23, 20:23 UTC (avoids top-of-hour congestion)
-    - cron: '23 0,4,8,12,16,20 * 9-12,1 0,1,4'
+    - cron: '23 0,4,8,12,16,20 * * 0,1,4'
     
-    # Weekly Waiver Analysis - Tuesday around 10 AM EDT / 9 AM EST during NFL season
+    # Weekly Waiver Analysis - Tuesday around 10 AM EDT / 9 AM EST
     # Essential for waiver wire decisions
-    - cron: '29 14 * 9-12,1 2'
+    - cron: '29 14 * * 2'
   
   # Manual triggers
   workflow_dispatch:
@@ -106,11 +107,11 @@ jobs:
           # Determine intelligence mode based on trigger
           if [[ "${{ github.event.inputs.intelligence_mode }}" != "" ]]; then
             INTEL_MODE="${{ github.event.inputs.intelligence_mode }}"
-          elif [[ "${{ github.event.schedule }}" == "17 13 * 9-12,1 *" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "17 13 * * *" ]]; then
             INTEL_MODE="full"
-          elif [[ "${{ github.event.schedule }}" == "23 0,4,8,12,16,20 * 9-12,1 0,1,4" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "23 0,4,8,12,16,20 * * 0,1,4" ]]; then
             INTEL_MODE="realtime"
-          elif [[ "${{ github.event.schedule }}" == "29 14 * 9-12,1 2" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "29 14 * * 2" ]]; then
             INTEL_MODE="analytics"
           else
             INTEL_MODE="full"
@@ -127,6 +128,15 @@ jobs:
           ")
           echo "current_week=$CURRENT_WEEK" >> $GITHUB_OUTPUT
           
+          # Keep cron expressions simple/reliable, then gate scheduled runs to NFL season here.
+          CURRENT_MONTH=$(date -u +%m)
+          if [[ "${{ github.event_name }}" == "schedule" && ! "$CURRENT_MONTH" =~ ^(09|10|11|12|01)$ ]]; then
+            echo "⏭️ Scheduled run skipped outside NFL season (UTC month=$CURRENT_MONTH)"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ Preflight check complete: mode=$INTEL_MODE, week=$CURRENT_WEEK, run=false"
+            exit 0
+          fi
+
           # Initialize environment and validate configuration
           if node dist/cli.js init; then
             echo "✅ Environment initialization successful"
