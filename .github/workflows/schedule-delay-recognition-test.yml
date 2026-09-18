@@ -1,0 +1,23 @@
+name: Schedule Delay Recognition Test
+
+on:
+  # Temporary scheduler diagnostic. Created 2026-09-18; first target: 2026-09-18 18:39 UTC.
+  # Remove after confirming whether GitHub schedule events are delivered.
+  schedule:
+    - cron: '39 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Print schedule diagnostic
+        run: |
+          echo "Schedule Delay Recognition Test fired"
+          echo "repository=${{ github.repository }}"
+          echo "event=${{ github.event_name }}"
+          echo "schedule=${{ github.event.schedule }}"
+          echo "ref=${{ github.ref }}"
+          echo "sha=${{ github.sha }}"
+          date -u
