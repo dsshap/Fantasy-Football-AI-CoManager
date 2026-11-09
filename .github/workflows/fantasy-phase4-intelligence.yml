@@ -803,6 +803,7 @@ jobs:
       issues: write
     steps:
       - name: Create Intelligence Failure Issue
+        continue-on-error: true # Repository has Issues disabled; never fail the workflow on reporting
         uses: actions/github-script@v7
         with:
           script: |

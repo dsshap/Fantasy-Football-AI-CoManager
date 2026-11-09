@@ -74,38 +74,52 @@ export class LLMConfigManager {
     }
   }
 
-  private async detectAndCreateConfig(): Promise<LLMConfig> {
-    const primaryProvider = (process.env.PRIMARY_LLM_PROVIDER || 'gemini') as LLMProviderType;
-    const primaryConfig = this.createConfigForProvider(primaryProvider);
-    if (primaryConfig) return primaryConfig;
-
-    const fallbackOrder: LLMProviderType[] = [
+  private getCandidateProviders(): LLMProviderType[] {
+    const supported: LLMProviderType[] = [
       'gemini',
       'claude',
       'openai',
       'perplexity',
       'openai-compatible'
     ];
-
-    for (const provider of fallbackOrder) {
-      const config = this.createConfigForProvider(provider);
-      if (config) return config;
+    const candidates: LLMProviderType[] = [];
+    const push = (provider: string | undefined) => {
+      if (provider && (supported as string[]).includes(provider)) {
+        const typed = provider as LLMProviderType;
+        if (!candidates.includes(typed)) candidates.push(typed);
+      }
+    };
+    push(process.env.PRIMARY_LLM_PROVIDER || 'gemini');
+    push(process.env.FALLBACK_LLM_PROVIDER);
+    for (const provider of supported) {
+      push(provider);
     }
-
-    throw new Error('No LLM API keys found in environment variables (OPENAI_COMPATIBLE_API_KEY, GEMINI_API_KEY, CLAUDE_API_KEY, OPENAI_API_KEY, PERPLEXITY_API_KEY)');
+    return candidates;
   }
 
   private async getLLMManager(): Promise<LLMManager> {
-    if (!llmManager) {
-      llmManager = new LLMManager();
-      const config = await this.detectAndCreateConfig();
-      console.log(`🤖 Initializing LLM with provider: ${config.provider}`);
-      const success = await llmManager.initialize(config);
-      if (!success) {
-        throw new Error(`Failed to initialize LLM manager with ${config.provider}`);
+    if (llmManager) return llmManager;
+
+    const failures: string[] = [];
+    for (const provider of this.getCandidateProviders()) {
+      const config = this.createConfigForProvider(provider);
+      if (!config) continue; // No API key for this provider, try the next one.
+
+      console.log(`🤖 Initializing LLM with provider: ${provider}`);
+      const manager = new LLMManager();
+      const success = await manager.initialize(config);
+      if (success) {
+        llmManager = manager;
+        return llmManager;
       }
+      failures.push(provider);
+      console.warn(`⚠️ LLM provider ${provider} failed validation, trying next configured provider...`);
     }
-    return llmManager;
+
+    throw new Error(
+      `Failed to initialize any LLM provider${failures.length ? ` (validation failed for: ${failures.join(', ')})` : ' (no provider API keys found)'}. ` +
+      'Check that at least one provider API key is set and the configured model is available on your plan.'
+    );
   }
 
   async initializeLLM(): Promise<boolean> {
